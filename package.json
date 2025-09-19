@@ -12,6 +12,6 @@
     "@sparticuz/chromium": "^118.0.0"
   },
   "engines": {
-    "node": "24.8.0"
+    "node": "22.x"
   }
 }
