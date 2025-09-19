@@ -1,91 +1,79 @@
-import puppeteer from 'puppeteer-core';
-import chromium from '@sparticuz/chromium';
+const puppeteer = require('puppeteer');
 
 export default async function handler(req, res) {
-  // Enable CORS
+  // Set CORS headers
   res.setHeader('Access-Control-Allow-Origin', '*');
   res.setHeader('Access-Control-Allow-Methods', 'GET, POST, OPTIONS');
-  res.setHeader('Access-Control-Allow-Headers', 'Content-Type');
+  res.setHeader('Access-Control-Allow-Headers', 'Content-Type, Authorization');
 
   // Handle preflight requests
   if (req.method === 'OPTIONS') {
-    return res.status(200).end();
+    res.status(200).end();
+    return;
   }
 
-  // Only allow GET and POST
-  if (req.method !== 'GET' && req.method !== 'POST') {
-    return res.status(405).json({ error: 'Method not allowed' });
-  }
-
-  // Handle GET request (health check)
-  if (req.method === 'GET') {
-    return res.status(200).json({
-      message: 'HTML to Image API is running on Vercel!',
-      usage: 'Send POST request with { "html": "<html>...</html>" }',
-      parameters: {
-        html: 'Required - HTML content to convert',
-        width: 'Optional - Image width (default: 1024)',
-        height: 'Optional - Image height (default: 1024)',
-        format: 'Optional - png or jpeg (default: png)'
-      }
-    });
+  if (req.method !== 'POST') {
+    return res.status(405).json({ error: 'Method not allowed. Use POST.' });
   }
 
   try {
-    const { html, width = 800, height = 600, format = 'png' } = req.body;
+    const { html, width = 1200, height = 800, format = 'png' } = req.body;
 
     if (!html) {
       return res.status(400).json({ error: 'HTML content is required' });
     }
 
-    // Launch browser with Vercel-optimized settings
+    // Launch Puppeteer with optimized settings for Vercel
     const browser = await puppeteer.launch({
-      args: chromium.args,
-      defaultViewport: chromium.defaultViewport,
-      executablePath: await chromium.executablePath(),
-      headless: chromium.headless,
-      ignoreHTTPSErrors: true,
+      headless: 'new',
+      args: [
+        '--no-sandbox',
+        '--disable-setuid-sandbox',
+        '--disable-dev-shm-usage',
+        '--disable-accelerated-2d-canvas',
+        '--no-first-run',
+        '--no-zygote',
+        '--disable-gpu'
+      ]
     });
 
     const page = await browser.newPage();
 
     // Set viewport
-    await page.setViewport({ 
-      width: parseInt(width), 
-      height: parseInt(height) 
+    await page.setViewport({
+      width: parseInt(width),
+      height: parseInt(height),
+      deviceScaleFactor: 1
     });
 
-    // Set HTML content with shorter timeout for Vercel
-    await page.setContent(html, { 
-      waitUntil: 'domcontentloaded',
-      timeout: 8000 
+    // Set content and wait for it to load
+    await page.setContent(html, {
+      waitUntil: ['networkidle0', 'domcontentloaded']
     });
 
     // Take screenshot
     const screenshot = await page.screenshot({
-      type: format === 'jpeg' ? 'jpeg' : 'png',
+      type: format,
       fullPage: true,
-      encoding: 'base64',
-      quality: format === 'jpeg' ? 90 : undefined
+      encoding: 'base64'
     });
 
     await browser.close();
 
-    // Return response
+    // Return base64 image
     res.status(200).json({
       success: true,
       image: `data:image/${format};base64,${screenshot}`,
       format: format,
-      width: parseInt(width),
-      height: parseInt(height)
+      message: 'Image generated successfully'
     });
 
   } catch (error) {
-    console.error('Conversion error:', error);
+    console.error('Error:', error);
     res.status(500).json({
-      error: 'Failed to convert HTML to image',
-      details: error.message,
-      tip: 'Try simpler HTML or smaller dimensions'
+      success: false,
+      error: 'Failed to generate image',
+      details: error.message
     });
   }
 }
