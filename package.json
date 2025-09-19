@@ -1,0 +1,17 @@
+{
+  "name": "html-to-image-vercel",
+  "version": "1.0.0",
+  "description": "Convert HTML to images using Puppeteer on Vercel",
+  "main": "api/api.js",
+  "scripts": {
+    "dev": "vercel dev",
+    "build": "echo 'No build step needed'"
+  },
+  "dependencies": {
+    "puppeteer-core": "^21.5.2",
+    "@sparticuz/chromium": "^118.0.0"
+  },
+  "engines": {
+    "node": "18.x"
+  }
+}
